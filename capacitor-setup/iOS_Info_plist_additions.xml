@@ -1,0 +1,7 @@
+<!-- Add these inside the <dict> tag in ios/App/App/Info.plist -->
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>LifeLane needs location for emergency routing and crash detection</string>
+<key>NSLocationAlwaysUsageDescription</key>
+<string>LifeLane needs background location for crash detection while driving</string>
+<key>NSMotionUsageDescription</key>
+<string>LifeLane uses motion sensors to detect accidents automatically</string>

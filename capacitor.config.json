@@ -1,0 +1,20 @@
+{
+  "appId": "com.lifelane.app",
+  "appName": "LifeLane",
+  "webDir": "src/main/resources/static",
+  "server": {
+    "url": "https://lifelane-ai.onrender.com",
+    "cleartext": true
+  },
+  "plugins": {
+    "Geolocation": {
+      "permissions": [
+        "location"
+      ]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#FF0000"
+    }
+  }
+}
