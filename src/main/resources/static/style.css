@@ -99,10 +99,9 @@ html, body { height:100%; overflow:hidden; background:var(--bg-base); color:var(
 .page.active { opacity:1; pointer-events:all; z-index:10; }
 
 /* ── HOME ── */
-#page-home {
+#page-home, #page-auth {
   display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;
-}
-.home-bg { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+}.home-bg { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
 .grid-overlay {
   position:absolute; inset:0;
   background-image: linear-gradient(rgba(0,145,255,.04) 1px,transparent 1px),
@@ -132,7 +131,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg-base); color:var(
 .d3{top:74%;animation-duration:10s;animation-delay:1.5s}
 @keyframes moveDot{from{left:-5%}to{left:108%}}
 
-.home-content{position:relative;z-index:2;text-align:center;max-width:640px;padding:0 24px;}
+.home-content{position:relative;z-index:2;text-align:center;max-width:640px;padding:0 24px;width:100%;pointer-events:all;}
 .home-badge{
   display:inline-block;font-family:var(--fm);font-size:10px;letter-spacing:3px;
   color:var(--cyan);border:1px solid rgba(0,229,255,.3);padding:5px 16px;border-radius:20px;
