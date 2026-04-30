@@ -1,5 +1,6 @@
-package com.lifelane.lifelane_ai;
 
+package com.lifelane.lifelane_ai;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
