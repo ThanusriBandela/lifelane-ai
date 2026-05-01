@@ -903,3 +903,14 @@ function doLogin(){
   setCurrentUser({name:user.name,email:user.email,contacts:user.contacts});
   enterApp();
 }
+
+window.onload = function() {
+  var user = getCurrentUser();
+  if (user) {
+    var g = document.getElementById('home-user-greeting');
+    if (g) g.textContent = 'Welcome, ' + user.name.split(' ')[0] + ' ??';
+    showPage('page-home');
+  } else {
+    showPage('page-auth');
+  }
+};
