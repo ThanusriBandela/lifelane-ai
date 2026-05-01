@@ -7,13 +7,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  
   <link rel="stylesheet" href="style.css"/>
   <script>
+    /* ── EARLY FUNCTIONS — available before app.js loads ── */
+
     function showPage(id) {
       document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
       document.getElementById(id).classList.add('active');
     }
+
+    /* ── AUTH HELPERS ── */
+    function _getUsers()  { try { return JSON.parse(localStorage.getItem('ll_users')||'[]'); } catch(e){ return []; } }
+    function _getUser()   { try { return JSON.parse(localStorage.getItem('ll_current_user')||'null'); } catch(e){ return null; } }
+
     function signupStep1Next() {
       var name  = document.getElementById('signup-name').value.trim();
       var email = document.getElementById('signup-email').value.trim();
@@ -23,8 +29,10 @@
       if (!name) { err.textContent = 'Please enter your full name.'; err.style.display='block'; return; }
       if (!email || !email.includes('@')) { err.textContent = 'Please enter a valid email.'; err.style.display='block'; return; }
       if (pass.length < 6) { err.textContent = 'Password must be at least 6 characters.'; err.style.display='block'; return; }
-      var users = JSON.parse(localStorage.getItem('ll_users')||'[]');
-      if (users.find(function(u){ return u.email===email; })) { err.textContent = 'Account already exists. Please login.'; err.style.display='block'; return; }
+      var users = _getUsers();
+      if (users.find(function(u){ return u.email===email; })) {
+        err.textContent = 'Account already exists. Please login.'; err.style.display='block'; return;
+      }
       var wrap = document.getElementById('signup-contacts-fields');
       wrap.innerHTML = '';
       for (var i=1; i<=5; i++) {
@@ -37,11 +45,14 @@
       document.getElementById('signup-step2').style.display = 'block';
       document.getElementById('signup-step-num').textContent = '2';
     }
+
     function signupBackToStep1() {
       document.getElementById('signup-step2').style.display = 'none';
       document.getElementById('signup-step1').style.display = 'block';
       document.getElementById('signup-step-num').textContent = '1';
+      document.getElementById('signup-error2').style.display = 'none';
     }
+
     function doSignup() {
       var name  = document.getElementById('signup-name').value.trim();
       var email = document.getElementById('signup-email').value.trim();
@@ -54,32 +65,67 @@
         if (el && el.value.trim()) contacts.push(el.value.trim());
       }
       if (contacts.length < 1) { err.textContent = 'Please enter at least 1 family contact number.'; err.style.display='block'; return; }
-      var users = JSON.parse(localStorage.getItem('ll_users')||'[]');
+      var users = _getUsers();
       users.push({ name:name, email:email, pass:pass, contacts:contacts });
       localStorage.setItem('ll_users', JSON.stringify(users));
       localStorage.setItem('ll_current_user', JSON.stringify({ name:name, email:email, contacts:contacts }));
       var g = document.getElementById('home-user-greeting');
-      if (g) g.textContent = 'Welcome, ' + name.split(' ')[0] + ' 👋';
+      if (g) g.textContent = 'Welcome, ' + name.split(' ')[0] + ' \uD83D\uDC4B';
       showPage('page-home');
     }
+
     function doLogin() {
       var email = document.getElementById('login-email').value.trim();
       var pass  = document.getElementById('login-password').value;
       var err   = document.getElementById('login-error');
       err.style.display = 'none';
       if (!email || !pass) { err.textContent = 'Please enter email and password.'; err.style.display='block'; return; }
-      var users = JSON.parse(localStorage.getItem('ll_users')||'[]');
+      var users = _getUsers();
       var user  = users.find(function(u){ return u.email===email && u.pass===pass; });
       if (!user) { err.textContent = 'Incorrect email or password.'; err.style.display='block'; return; }
       localStorage.setItem('ll_current_user', JSON.stringify({ name:user.name, email:user.email, contacts:user.contacts }));
       var g = document.getElementById('home-user-greeting');
-      if (g) g.textContent = 'Welcome, ' + user.name.split(' ')[0] + ' 👋';
+      if (g) g.textContent = 'Welcome, ' + user.name.split(' ')[0] + ' \uD83D\uDC4B';
       showPage('page-home');
     }
+
+    function doLogout() {
+      localStorage.removeItem('ll_current_user');
+      showPage('page-auth');
+    }
+
+    function goToHome() {
+      var user = _getUser();
+      if (!user) { showPage('page-auth'); return; }
+      showPage('page-home');
+    }
+
+    function goToSelect() {
+      showPage('page-select');
+    }
+
+    function goToHistory() {
+      showPage('page-history');
+      // loadDispatchHistory is defined in app.js, call after short delay
+      setTimeout(function(){ if(typeof loadDispatchHistory==='function') loadDispatchHistory(); }, 100);
+    }
+
+    function goToMap(mode) {
+      showPage('page-map');
+      // initMapPage is defined in app.js
+      setTimeout(function(){ if(typeof initMapPage==='function') initMapPage(mode); }, 100);
+    }
+
+    function toggleMobileMapView() {
+      var body = document.getElementById('map-body');
+      var btn  = document.getElementById('map-toggle-btn');
+      if (!body) return;
+      var isMapView = body.classList.toggle('map-view-active');
+      if (btn) btn.textContent = isMapView ? '\u2630' : '\uD83D\uDDFA\uFE0F';
+      if (typeof map !== 'undefined' && map) setTimeout(function(){ map.invalidateSize(); }, 50);
+    }
   </script>
-
 </head>
-
 <body>
 
 <!-- Theme Toggle -->
@@ -259,7 +305,6 @@
       <p class="select-sub">Choose how you want to navigate</p>
     </div>
     <div class="mode-cards">
-
       <div class="mode-card normal-card" onclick="goToMap('normal')">
         <div class="mode-card-bg normal-bg"></div>
         <div class="mode-card-icon">🗺️</div>
@@ -274,7 +319,6 @@
         </div>
         <div class="mode-card-action">Start Normal Route →</div>
       </div>
-
       <div class="mode-card emg-card" onclick="goToMap('emergency')">
         <div class="mode-card-bg emg-bg"></div>
         <div class="mode-card-icon">🚨</div>
@@ -289,7 +333,6 @@
         </div>
         <div class="mode-card-action emg-action">Dispatch Emergency →</div>
       </div>
-
     </div>
   </div>
 </div>
@@ -297,7 +340,6 @@
 
 <!-- PAGE 3 — MAP -->
 <div id="page-map" class="page">
-
   <div id="map-topbar">
     <div class="topbar-left">
       <button class="back-btn-small" onclick="goToSelect()">←</button>
@@ -312,17 +354,13 @@
     </div>
     <div class="topbar-right">
       <div id="clock-map" class="map-clock">--:--:--</div>
-      <!-- Mobile map toggle -->
       <button class="map-toggle-btn" id="map-toggle-btn" onclick="toggleMobileMapView()" title="Toggle map/sidebar">🗺️</button>
     </div>
   </div>
 
   <div id="map-body">
-
-    <!-- SIDEBAR -->
     <div id="sidebar">
 
-      <!-- RFID Panel (emergency only) -->
       <div id="rfid-panel" class="sidebar-section" style="display:none">
         <div class="s-label">RFID VEHICLE IDENTIFICATION</div>
         <div class="rfid-reader-wrap">
@@ -342,7 +380,6 @@
         </div>
       </div>
 
-      <!-- Emergency vehicle type -->
       <div id="emg-type-panel" class="sidebar-section" style="display:none">
         <div class="s-label">VEHICLE TYPE</div>
         <div class="type-grid">
@@ -353,14 +390,11 @@
         </div>
       </div>
 
-      <!-- Source -->
       <div class="sidebar-section">
         <div class="s-label">PICKUP / SOURCE</div>
         <div class="location-input-wrap" id="src-wrap">
           <span class="loc-dot src-dot"></span>
-          <input type="text" id="src-input" class="loc-input"
-                 placeholder="Search or speak pickup location…"
-                 oninput="onLocationInput('src')" autocomplete="off"/>
+          <input type="text" id="src-input" class="loc-input" placeholder="Search or speak pickup location…" oninput="onLocationInput('src')" autocomplete="off"/>
           <button class="loc-voice-btn" id="src-voice-btn" onclick="startVoiceInput('src')" title="Voice input">🎤</button>
           <button class="loc-gps-btn" onclick="useMyLocation('src')" title="Use my location">◎</button>
         </div>
@@ -368,32 +402,26 @@
         <div class="autocomplete-list" id="src-auto"></div>
       </div>
 
-      <!-- Destination -->
       <div class="sidebar-section">
         <div class="s-label">DROP-OFF / DESTINATION</div>
         <div class="location-input-wrap" id="dst-wrap">
           <span class="loc-dot dst-dot"></span>
-          <input type="text" id="dst-input" class="loc-input"
-                 placeholder="Search or speak destination…"
-                 oninput="onLocationInput('dst')" autocomplete="off"/>
+          <input type="text" id="dst-input" class="loc-input" placeholder="Search or speak destination…" oninput="onLocationInput('dst')" autocomplete="off"/>
           <button class="loc-voice-btn" id="dst-voice-btn" onclick="startVoiceInput('dst')" title="Voice input">🎤</button>
         </div>
         <div class="voice-status-bar" id="dst-voice-status"></div>
         <div class="autocomplete-list" id="dst-auto"></div>
       </div>
 
-      <!-- Alert message (emergency only) -->
       <div id="alert-msg-panel" class="sidebar-section" style="display:none">
         <div class="s-label">BROADCAST ALERT MESSAGE</div>
-        <textarea id="alert-msg" class="alert-textarea"
-          placeholder="Alert message sent via WebSocket + voice to all nearby vehicles…">🚨 Emergency vehicle approaching — please clear the road immediately!</textarea>
+        <textarea id="alert-msg" class="alert-textarea" placeholder="Alert message sent via WebSocket + voice to all nearby vehicles…">🚨 Emergency vehicle approaching — please clear the road immediately!</textarea>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button class="voice-test-btn" onclick="testVoiceAlert()">🔊 Test Voice Alert</button>
           <button class="voice-test-btn" style="flex:1" onclick="stopVoiceAlert()">⏹ Stop</button>
         </div>
       </div>
 
-      <!-- Route button -->
       <div class="sidebar-section">
         <button id="route-btn" class="route-btn normal-mode" onclick="calculateRoute()">
           <span id="route-btn-txt">🗺️ FIND ROUTES</span>
@@ -401,19 +429,16 @@
         <button class="clear-btn" onclick="clearAll()">✕ CLEAR MAP</button>
       </div>
 
-      <!-- Route result cards -->
       <div id="route-results" class="sidebar-section" style="display:none">
         <div class="s-label">ROUTE OPTIONS</div>
         <div id="route-cards"></div>
       </div>
 
-      <!-- Traffic signals (emergency) -->
       <div id="signal-panel" class="sidebar-section" style="display:none">
         <div class="s-label">IoT SIGNAL OVERRIDE</div>
         <div id="signal-list"></div>
       </div>
 
-      <!-- Live WebSocket alert feed -->
       <div class="sidebar-section grow">
         <div class="s-label" style="display:flex;justify-content:space-between;align-items:center;">
           <span>LIVE ALERT FEED</span>
@@ -423,12 +448,10 @@
       </div>
 
     </div><!-- /sidebar -->
-
-    <!-- MAP CONTAINER -->
     <div id="map"></div>
-
   </div>
 </div><!-- /page-map -->
+
 
 <!-- PAGE 4 — DISPATCH HISTORY -->
 <div id="page-history" class="page">
