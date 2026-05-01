@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="style.css"/>
- 
 </head>
 <body>
 
@@ -278,7 +277,9 @@
         <div class="s-label">PICKUP / SOURCE</div>
         <div class="location-input-wrap" id="src-wrap">
           <span class="loc-dot src-dot"></span>
-          <input type="text" id="src-input" class="loc-input" placeholder="Search or speak pickup location…" oninput="onLocationInput('src')" autocomplete="off"/>
+          <input type="text" id="src-input" class="loc-input"
+                 placeholder="Search or speak pickup location…"
+                 oninput="onLocationInput('src')" autocomplete="off"/>
           <button class="loc-voice-btn" id="src-voice-btn" onclick="startVoiceInput('src')" title="Voice input">🎤</button>
           <button class="loc-gps-btn" onclick="useMyLocation('src')" title="Use my location">◎</button>
         </div>
@@ -290,7 +291,9 @@
         <div class="s-label">DROP-OFF / DESTINATION</div>
         <div class="location-input-wrap" id="dst-wrap">
           <span class="loc-dot dst-dot"></span>
-          <input type="text" id="dst-input" class="loc-input" placeholder="Search or speak destination…" oninput="onLocationInput('dst')" autocomplete="off"/>
+          <input type="text" id="dst-input" class="loc-input"
+                 placeholder="Search or speak destination…"
+                 oninput="onLocationInput('dst')" autocomplete="off"/>
           <button class="loc-voice-btn" id="dst-voice-btn" onclick="startVoiceInput('dst')" title="Voice input">🎤</button>
         </div>
         <div class="voice-status-bar" id="dst-voice-status"></div>
@@ -299,7 +302,8 @@
 
       <div id="alert-msg-panel" class="sidebar-section" style="display:none">
         <div class="s-label">BROADCAST ALERT MESSAGE</div>
-        <textarea id="alert-msg" class="alert-textarea" placeholder="Alert message sent via WebSocket + voice to all nearby vehicles…">🚨 Emergency vehicle approaching — please clear the road immediately!</textarea>
+        <textarea id="alert-msg" class="alert-textarea"
+          placeholder="Alert message sent via WebSocket + voice to all nearby vehicles…">🚨 Emergency vehicle approaching — please clear the road immediately!</textarea>
         <div style="display:flex;gap:6px;margin-top:6px">
           <button class="voice-test-btn" onclick="testVoiceAlert()">🔊 Test Voice Alert</button>
           <button class="voice-test-btn" style="flex:1" onclick="stopVoiceAlert()">⏹ Stop</button>
