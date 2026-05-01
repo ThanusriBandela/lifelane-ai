@@ -14,7 +14,70 @@
       document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
       document.getElementById(id).classList.add('active');
     }
+    function signupStep1Next() {
+      var name  = document.getElementById('signup-name').value.trim();
+      var email = document.getElementById('signup-email').value.trim();
+      var pass  = document.getElementById('signup-password').value;
+      var err   = document.getElementById('signup-error1');
+      err.style.display = 'none';
+      if (!name) { err.textContent = 'Please enter your full name.'; err.style.display='block'; return; }
+      if (!email || !email.includes('@')) { err.textContent = 'Please enter a valid email.'; err.style.display='block'; return; }
+      if (pass.length < 6) { err.textContent = 'Password must be at least 6 characters.'; err.style.display='block'; return; }
+      var users = JSON.parse(localStorage.getItem('ll_users')||'[]');
+      if (users.find(function(u){ return u.email===email; })) { err.textContent = 'Account already exists. Please login.'; err.style.display='block'; return; }
+      var wrap = document.getElementById('signup-contacts-fields');
+      wrap.innerHTML = '';
+      for (var i=1; i<=5; i++) {
+        var row = document.createElement('div');
+        row.className = 'contact-field-row';
+        row.innerHTML = '<div class="contact-num-badge">'+i+'</div><input type="tel" id="contact-'+i+'" class="auth-input" placeholder="Contact '+i+' phone number"/>';
+        wrap.appendChild(row);
+      }
+      document.getElementById('signup-step1').style.display = 'none';
+      document.getElementById('signup-step2').style.display = 'block';
+      document.getElementById('signup-step-num').textContent = '2';
+    }
+    function signupBackToStep1() {
+      document.getElementById('signup-step2').style.display = 'none';
+      document.getElementById('signup-step1').style.display = 'block';
+      document.getElementById('signup-step-num').textContent = '1';
+    }
+    function doSignup() {
+      var name  = document.getElementById('signup-name').value.trim();
+      var email = document.getElementById('signup-email').value.trim();
+      var pass  = document.getElementById('signup-password').value;
+      var err   = document.getElementById('signup-error2');
+      err.style.display = 'none';
+      var contacts = [];
+      for (var i=1; i<=5; i++) {
+        var el = document.getElementById('contact-'+i);
+        if (el && el.value.trim()) contacts.push(el.value.trim());
+      }
+      if (contacts.length < 1) { err.textContent = 'Please enter at least 1 family contact number.'; err.style.display='block'; return; }
+      var users = JSON.parse(localStorage.getItem('ll_users')||'[]');
+      users.push({ name:name, email:email, pass:pass, contacts:contacts });
+      localStorage.setItem('ll_users', JSON.stringify(users));
+      localStorage.setItem('ll_current_user', JSON.stringify({ name:name, email:email, contacts:contacts }));
+      var g = document.getElementById('home-user-greeting');
+      if (g) g.textContent = 'Welcome, ' + name.split(' ')[0] + ' 👋';
+      showPage('page-home');
+    }
+    function doLogin() {
+      var email = document.getElementById('login-email').value.trim();
+      var pass  = document.getElementById('login-password').value;
+      var err   = document.getElementById('login-error');
+      err.style.display = 'none';
+      if (!email || !pass) { err.textContent = 'Please enter email and password.'; err.style.display='block'; return; }
+      var users = JSON.parse(localStorage.getItem('ll_users')||'[]');
+      var user  = users.find(function(u){ return u.email===email && u.pass===pass; });
+      if (!user) { err.textContent = 'Incorrect email or password.'; err.style.display='block'; return; }
+      localStorage.setItem('ll_current_user', JSON.stringify({ name:user.name, email:user.email, contacts:user.contacts }));
+      var g = document.getElementById('home-user-greeting');
+      if (g) g.textContent = 'Welcome, ' + user.name.split(' ')[0] + ' 👋';
+      showPage('page-home');
+    }
   </script>
+
 </head>
 
 <body>
