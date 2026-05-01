@@ -832,3 +832,74 @@ document.addEventListener('click', e => {
 window.addEventListener('load', () => {
   showPage('page-home');
 });
+/* -- AUTH SYSTEM ---------------------------------------------- */
+function getCurrentUser() { try { return JSON.parse(localStorage.getItem('ll_current_user')||'null'); } catch(e){ return null; } }
+function getUsers() { try { return JSON.parse(localStorage.getItem('ll_users')||'[]'); } catch(e){ return []; } }
+function setCurrentUser(u) { localStorage.setItem('ll_current_user', JSON.stringify(u)); }
+
+function enterApp() {
+  var user = getCurrentUser();
+  if (!user) { showPage('page-auth'); return; }
+  var g = document.getElementById('home-user-greeting');
+  if (g) g.textContent = 'Welcome, ' + user.name.split(' ')[0] + ' ??';
+  showPage('page-home');
+}
+function doLogout() { localStorage.removeItem('ll_current_user'); disconnectWS(); stopVoiceAlert(); showPage('page-auth'); }
+function goToHome() { if(!getCurrentUser()){showPage('page-auth');return;} showPage('page-home'); disconnectWS(); stopVoiceAlert(); }
+function goToSelect() { showPage('page-select'); disconnectWS(); stopVoiceAlert(); }
+function goToHistory() { showPage('page-history'); loadDispatchHistory(); }
+function goToMap(mode) { S.mode=mode; showPage('page-map'); initMapPage(mode); }
+function toggleMobileMapView() {
+  var body = document.getElementById('map-body');
+  var btn = document.getElementById('map-toggle-btn');
+  if (!body) return;
+  var isMapView = body.classList.toggle('map-view-active');
+  if (btn) btn.textContent = isMapView ? '?' : '???';
+  if (map) setTimeout(function(){ map.invalidateSize(); }, 50);
+}
+function signupStep1Next() {
+  var name=document.getElementById('signup-name').value.trim();
+  var email=document.getElementById('signup-email').value.trim();
+  var pass=document.getElementById('signup-password').value;
+  var err=document.getElementById('signup-error1');
+  err.style.display='none';
+  if(!name){err.textContent='Please enter your full name.';err.style.display='block';return;}
+  if(!email||!email.includes('@')){err.textContent='Please enter a valid email.';err.style.display='block';return;}
+  if(pass.length<6){err.textContent='Password must be at least 6 characters.';err.style.display='block';return;}
+  var users=getUsers();
+  if(users.find(function(u){return u.email===email;})){err.textContent='Account already exists. Please login.';err.style.display='block';return;}
+  var wrap=document.getElementById('signup-contacts-fields');
+  wrap.innerHTML='';
+  for(var i=1;i<=5;i++){var row=document.createElement('div');row.className='contact-field-row';row.innerHTML='<div class="contact-num-badge">'+i+'</div><input type="tel" id="contact-'+i+'" class="auth-input" placeholder="Contact '+i+' phone number"/>';wrap.appendChild(row);}
+  document.getElementById('signup-step1').style.display='none';
+  document.getElementById('signup-step2').style.display='block';
+  document.getElementById('signup-step-num').textContent='2';
+}
+function signupBackToStep1(){document.getElementById('signup-step2').style.display='none';document.getElementById('signup-step1').style.display='block';document.getElementById('signup-step-num').textContent='1';document.getElementById('signup-error2').style.display='none';}
+function doSignup(){
+  var name=document.getElementById('signup-name').value.trim();
+  var email=document.getElementById('signup-email').value.trim();
+  var pass=document.getElementById('signup-password').value;
+  var err=document.getElementById('signup-error2');
+  err.style.display='none';
+  var contacts=[];
+  for(var i=1;i<=5;i++){var el=document.getElementById('contact-'+i);if(el&&el.value.trim())contacts.push(el.value.trim());}
+  if(contacts.length<1){err.textContent='Please enter at least 1 family contact number.';err.style.display='block';return;}
+  var users=getUsers();
+  users.push({name:name,email:email,pass:pass,contacts:contacts});
+  localStorage.setItem('ll_users',JSON.stringify(users));
+  setCurrentUser({name:name,email:email,contacts:contacts});
+  enterApp();
+}
+function doLogin(){
+  var email=document.getElementById('login-email').value.trim();
+  var pass=document.getElementById('login-password').value;
+  var err=document.getElementById('login-error');
+  err.style.display='none';
+  if(!email||!pass){err.textContent='Please enter email and password.';err.style.display='block';return;}
+  var users=getUsers();
+  var user=users.find(function(u){return u.email===email&&u.pass===pass;});
+  if(!user){err.textContent='Incorrect email or password.';err.style.display='block';return;}
+  setCurrentUser({name:user.name,email:user.email,contacts:user.contacts});
+  enterApp();
+}
