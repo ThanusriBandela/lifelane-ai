@@ -1,6 +1,6 @@
-/* ═══════════════════════════════════════════════
-   LifeLane AI — styles.css
-   ═══════════════════════════════════════════════ */
+/* 
+   LifeLane AI  styles.css
+    */
 
 :root {
   --black:   #03070d;
@@ -36,7 +36,7 @@
   --shadow-glow: rgba(0,0,0,.5);
 }
 
-/* ── LIGHT THEME ── */
+/*  LIGHT THEME  */
 html.light {
   --bg-base:    #f0f4fb;
   --bg-page:    #e8eef8;
@@ -60,7 +60,7 @@ html.light {
   --border:  rgba(0,0,0,0.08);
 }
 
-/* ── THEME TOGGLE BUTTON ── */
+/*  THEME TOGGLE BUTTON  */
 .theme-toggle {
   position: fixed;
   bottom: 24px;
@@ -94,14 +94,15 @@ html.light .theme-toggle { box-shadow: 0 2px 12px rgba(0,0,0,.15); }
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html, body { height:100%; overflow:hidden; background:var(--bg-base); color:var(--text-main); font-family:var(--fb); }
 
-/* ── PAGES ── */
+/*  PAGES  */
 .page { position:fixed; inset:0; opacity:0; pointer-events:none; transition:opacity .4s ease; z-index:1; }
 .page.active { opacity:1; pointer-events:all; z-index:10; }
 
-/* ── HOME ── */
+/*  HOME  */
 #page-home, #page-auth {
   display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;
-}.home-bg { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:0; }
+}
+.home-bg { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
 .grid-overlay {
   position:absolute; inset:0;
   background-image: linear-gradient(rgba(0,145,255,.04) 1px,transparent 1px),
@@ -131,7 +132,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg-base); color:var(
 .d3{top:74%;animation-duration:10s;animation-delay:1.5s}
 @keyframes moveDot{from{left:-5%}to{left:108%}}
 
-.home-content{position:relative;z-index:100;text-align:center;max-width:640px;padding:0 24px;width:100%;pointer-events:all;}
+.home-content{position:relative;z-index:2;text-align:center;max-width:640px;padding:0 24px;width:100%;pointer-events:all;}
 .home-badge{
   display:inline-block;font-family:var(--fm);font-size:10px;letter-spacing:3px;
   color:var(--cyan);border:1px solid rgba(0,229,255,.3);padding:5px 16px;border-radius:20px;
@@ -148,11 +149,12 @@ html, body { height:100%; overflow:hidden; background:var(--bg-base); color:var(
 .feat{display:flex;align-items:center;gap:7px;font-size:12px;color:rgba(238,245,255,.45);font-family:var(--fm);}
 .feat-icon{font-size:15px;}
 .btn-start{
-  display:inline-flex;align-items:center;gap:12px;background:var(--red);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;gap:12px;background:var(--red);color:#fff;
   border:none;border-radius:50px;cursor:pointer;font-family:var(--fh);font-size:14px;
-  font-weight:700;letter-spacing:2px;padding:17px 46px;
+  font-weight:700;letter-spacing:2px;padding:17px 46px;width:100%;
   box-shadow:0 0 40px rgba(255,32,32,.4),0 4px 20px rgba(0,0,0,.5);
   transition:all .25s;animation:fadeUp .7s ease .4s both;
+  position:relative;z-index:10;
 }
 .btn-start:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 0 60px rgba(255,32,32,.6),0 8px 30px rgba(0,0,0,.5);}
 .home-footer{
@@ -175,7 +177,7 @@ html.light .leaflet-popup-content { color:var(--text-main)!important; }
 html.light .spinner { border-color:rgba(0,0,0,.15); border-top-color:var(--text-main); }
 @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 
-/* ── HISTORY BUTTON ── */
+/*  HISTORY BUTTON  */
 .btn-history {
   display:inline-flex;align-items:center;gap:10px;
   background:transparent;color:var(--white);
@@ -188,7 +190,7 @@ html.light .spinner { border-color:rgba(0,0,0,.15); border-top-color:var(--text-
 html.light .btn-history{color:var(--text-main);border-color:rgba(0,0,0,.2);}
 html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 
-/* ── HISTORY PAGE ── */
+/*  HISTORY PAGE  */
 #page-history{display:flex;align-items:flex-start;justify-content:center;overflow:hidden;}
 .history-content{
   position:relative;z-index:2;width:100%;max-width:860px;
@@ -245,7 +247,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 .dispatch-badge.normal{background:rgba(0,217,95,.1);color:var(--green);border:1px solid rgba(0,217,95,.25);}
 .dispatch-timestamp{font-family:var(--fm);font-size:9px;color:var(--muted);margin-top:6px;}
 
-/* ── SELECT ── */
+/*  SELECT  */
 #page-select{display:flex;align-items:center;justify-content:center;overflow:hidden;}
 .select-content{position:relative;z-index:2;width:100%;max-width:920px;padding:40px 24px;}
 .select-header{text-align:center;margin-bottom:44px;}
@@ -286,7 +288,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 }
 .back-btn:hover{background:rgba(255,255,255,.12);}
 
-/* ── MAP PAGE ── */
+/*  MAP PAGE  */
 #page-map{display:flex;flex-direction:column;}
 #map-topbar{
   height:54px;background:var(--topbar-bg);
@@ -466,9 +468,9 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 /* Flash */
 .flash-overlay{position:fixed;inset:0;pointer-events:none;z-index:8000;animation:flashOut .6s ease forwards;}
 @keyframes flashOut{0%{background:rgba(255,32,32,.22)}100%{background:transparent}}
-/* ═══════════════════════════════════════════════════
+/* 
    RFID READER
-═══════════════════════════════════════════════════ */
+ */
 .rfid-reader-wrap{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
 .rfid-icon-box{position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .rfid-waves{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
@@ -486,9 +488,9 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 .rfid-reader-wrap.scanned{border-color:rgba(0,217,95,.5);animation:rfidSuccess .6s ease;}
 @keyframes rfidSuccess{0%,100%{box-shadow:none}50%{box-shadow:0 0 20px rgba(0,217,95,.4)}}
 
-/* ═══════════════════════════════════════════════════
+/* 
    VOICE INPUT BUTTONS
-═══════════════════════════════════════════════════ */
+ */
 .loc-voice-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px;transition:.2s;flex-shrink:0;}
 .loc-voice-btn:hover{color:var(--red);transform:scale(1.2);}
 .loc-voice-btn.listening{color:var(--red);animation:voicePulse .6s ease-in-out infinite;}
@@ -498,24 +500,24 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 .voice-test-btn{flex:1;padding:7px;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);color:var(--cyan);border-radius:7px;font-family:var(--fm);font-size:9px;letter-spacing:1px;cursor:pointer;transition:.2s;}
 .voice-test-btn:hover{background:rgba(0,229,255,.15);}
 
-/* ═══════════════════════════════════════════════════
+/* 
    VOICE LISTENING OVERLAY
-═══════════════════════════════════════════════════ */
+ */
 #voice-overlay{display:none;}
 #voice-overlay.show{display:flex!important;}
 .voice-listen-ring{width:90px;height:90px;border-radius:50%;border:3px solid var(--red);animation:voiceRing 1s ease-in-out infinite;}
 @keyframes voiceRing{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,32,32,.4)}50%{transform:scale(1.08);box-shadow:0 0 0 18px rgba(255,32,32,0)}}
 
-/* ═══════════════════════════════════════════════════════════════
-   UPGRADED STYLES — v2
-   ✅ Nearby Alert Popup
-   ✅ Live Vehicle Stats Panel
-   ✅ AI Traffic Prediction Panel
-   ✅ Offline Banner
-   ✅ Live Vehicle Icon
-   ═══════════════════════════════════════════════════════════════ */
+/* 
+   UPGRADED STYLES  v2
+    Nearby Alert Popup
+    Live Vehicle Stats Panel
+    AI Traffic Prediction Panel
+    Offline Banner
+    Live Vehicle Icon
+    */
 
-/* ── UPGRADE 4: Nearby Alert Popup ── */
+/*  UPGRADE 4: Nearby Alert Popup  */
 .nearby-alert-popup {
   position: fixed;
   top: 80px;
@@ -582,7 +584,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
   transform-origin: left;
 }
 
-/* ── UPGRADE 2: Live Vehicle Stats ── */
+/*  UPGRADE 2: Live Vehicle Stats  */
 .vehicle-stats-panel {
   border-top: 1px solid rgba(255,32,32,0.2);
   background: rgba(255,32,32,0.04);
@@ -655,7 +657,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
   animation: pulseBadge 1s ease infinite alternate;
 }
 
-/* ── Live Vehicle Icon ── */
+/*  Live Vehicle Icon  */
 .live-vehicle-icon {
   position: relative;
   font-size: 24px;
@@ -671,7 +673,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
   animation: vehiclePulseRing 1s ease-out infinite;
 }
 
-/* ── UPGRADE 3: AI Prediction Panel ── */
+/*  UPGRADE 3: AI Prediction Panel  */
 .prediction-panel {
   border-left: 2px solid rgba(0,200,100,0.4);
   background: rgba(0,200,100,0.03);
@@ -740,7 +742,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
   border-radius: 0 0 8px 8px;
 }
 
-/* ── UPGRADE 5: Offline Banner ── */
+/*  UPGRADE 5: Offline Banner  */
 .offline-banner {
   background: rgba(255,136,0,0.15);
   border: 1px solid rgba(255,136,0,0.4);
@@ -757,7 +759,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
   animation: offlinePulse 1.5s ease infinite alternate;
 }
 
-/* ── Offline Route Label (Leaflet tooltip override) ── */
+/*  Offline Route Label (Leaflet tooltip override)  */
 .offline-route-label {
   background: rgba(255,136,0,0.9) !important;
   border: none !important;
@@ -772,7 +774,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 }
 .offline-route-label::before { display: none !important; }
 
-/* ── Keyframes ── */
+/*  Keyframes  */
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(120%); }
   to   { opacity: 1; transform: translateX(0); }
@@ -806,9 +808,9 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
   to   { opacity: 1; }
 }
 
-/* ══════════════════════════════════════════════════════════════
+/* 
    AUTH PAGES
-   ══════════════════════════════════════════════════════════════ */
+    */
 
 .auth-btn-group {
   display: flex;
@@ -816,15 +818,21 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
   align-items: center;
   gap: 14px;
   animation: fadeUp .7s ease .4s both;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
 }
 
 .btn-signup {
-  display: inline-flex; align-items: center; gap: 12px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 12px;
   background: transparent; color: var(--white);
   border: 2px solid rgba(0,229,255,.5); border-radius: 50px;
   cursor: pointer; font-family: var(--fh); font-size: 14px;
   font-weight: 700; letter-spacing: 2px; padding: 15px 46px;
-  transition: all .25s;
+  transition: all .25s; width: 100%;
+  position: relative; z-index: 10;
 }
 .btn-signup:hover {
   border-color: var(--cyan); color: var(--cyan);
@@ -981,11 +989,11 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
 }
 .logout-btn:hover { background: rgba(255,32,32,.25); }
 
-/* ══════════════════════════════════════════════════════════════
+/* 
    MOBILE RESPONSIVE MAP LAYOUT
-   ══════════════════════════════════════════════════════════════ */
+    */
 
-/* Mobile map toggle button — hidden on desktop */
+/* Mobile map toggle button  hidden on desktop */
 .map-toggle-btn {
   display: none;
   background: rgba(0,145,255,.15); border: 1px solid rgba(0,145,255,.3);
@@ -1029,7 +1037,7 @@ html.light .btn-history:hover{border-color:var(--blue);color:var(--blue);}
     flex-shrink: 0;
   }
 
-  /* When map-view-active class is set: flip — map takes full screen */
+  /* When map-view-active class is set: flip  map takes full screen */
   #map-body.map-view-active #sidebar {
     display: none;
   }

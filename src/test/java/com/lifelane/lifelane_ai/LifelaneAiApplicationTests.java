@@ -5,8 +5,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 class LifelaneAiApplicationTests {
-
     @Test
-    void contextLoads() {
-    }
+    void contextLoads() {}
 }

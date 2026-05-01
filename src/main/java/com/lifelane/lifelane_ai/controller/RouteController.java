@@ -3,7 +3,6 @@ package com.lifelane.lifelane_ai.controller;
 import com.lifelane.lifelane_ai.model.Route;
 import com.lifelane.lifelane_ai.service.TrafficAIService;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -21,8 +20,14 @@ public class RouteController {
     public List<Route> getRoutes() {
         return aiService.getLiveRoutes();
     }
+
     @PostMapping("/save")
-public Route saveRoute(@RequestBody Route route) {
-    return aiService.saveToDB(route);
-}
+    public Route saveRoute(@RequestBody Route route) {
+        return aiService.saveToDB(route);
+    }
+
+    @GetMapping("/history")
+    public List<Route> getHistory() {
+        return aiService.getAllRoutes();
+    }
 }

@@ -29,7 +29,7 @@ public class WebSocketController {
 
     @MessageMapping("/emergency-alert")
     public void sendAlert(String message) {
-        System.out.println("🚨 Emergency: " + message);
+        System.out.println("Emergency Alert: " + message);
         template.convertAndSend("/topic/emergency-alerts", message);
     }
 }

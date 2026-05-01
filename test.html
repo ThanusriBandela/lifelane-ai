@@ -3,20 +3,137 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>LifeLane AI  Emergency Routing</title>
+  <title>LifeLane AI — Emergency Routing</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="style.css"/>
+  <script>
+    /* ── EARLY FUNCTIONS — available before app.js loads ── */
+
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+      document.getElementById(id).classList.add('active');
+    }
+
+    /* ── AUTH HELPERS ── */
+    function _getUsers()  { try { return JSON.parse(localStorage.getItem('ll_users')||'[]'); } catch(e){ return []; } }
+    function _getUser()   { try { return JSON.parse(localStorage.getItem('ll_current_user')||'null'); } catch(e){ return null; } }
+
+    function signupStep1Next() {
+      var name  = document.getElementById('signup-name').value.trim();
+      var email = document.getElementById('signup-email').value.trim();
+      var pass  = document.getElementById('signup-password').value;
+      var err   = document.getElementById('signup-error1');
+      err.style.display = 'none';
+      if (!name) { err.textContent = 'Please enter your full name.'; err.style.display='block'; return; }
+      if (!email || !email.includes('@')) { err.textContent = 'Please enter a valid email.'; err.style.display='block'; return; }
+      if (pass.length < 6) { err.textContent = 'Password must be at least 6 characters.'; err.style.display='block'; return; }
+      var users = _getUsers();
+      if (users.find(function(u){ return u.email===email; })) {
+        err.textContent = 'Account already exists. Please login.'; err.style.display='block'; return;
+      }
+      var wrap = document.getElementById('signup-contacts-fields');
+      wrap.innerHTML = '';
+      for (var i=1; i<=5; i++) {
+        var row = document.createElement('div');
+        row.className = 'contact-field-row';
+        row.innerHTML = '<div class="contact-num-badge">'+i+'</div><input type="tel" id="contact-'+i+'" class="auth-input" placeholder="Contact '+i+' phone number"/>';
+        wrap.appendChild(row);
+      }
+      document.getElementById('signup-step1').style.display = 'none';
+      document.getElementById('signup-step2').style.display = 'block';
+      document.getElementById('signup-step-num').textContent = '2';
+    }
+
+    function signupBackToStep1() {
+      document.getElementById('signup-step2').style.display = 'none';
+      document.getElementById('signup-step1').style.display = 'block';
+      document.getElementById('signup-step-num').textContent = '1';
+      document.getElementById('signup-error2').style.display = 'none';
+    }
+
+    function doSignup() {
+      var name  = document.getElementById('signup-name').value.trim();
+      var email = document.getElementById('signup-email').value.trim();
+      var pass  = document.getElementById('signup-password').value;
+      var err   = document.getElementById('signup-error2');
+      err.style.display = 'none';
+      var contacts = [];
+      for (var i=1; i<=5; i++) {
+        var el = document.getElementById('contact-'+i);
+        if (el && el.value.trim()) contacts.push(el.value.trim());
+      }
+      if (contacts.length < 1) { err.textContent = 'Please enter at least 1 family contact number.'; err.style.display='block'; return; }
+      var users = _getUsers();
+      users.push({ name:name, email:email, pass:pass, contacts:contacts });
+      localStorage.setItem('ll_users', JSON.stringify(users));
+      localStorage.setItem('ll_current_user', JSON.stringify({ name:name, email:email, contacts:contacts }));
+      var g = document.getElementById('home-user-greeting');
+      if (g) g.textContent = 'Welcome, ' + name.split(' ')[0] + ' \uD83D\uDC4B';
+      showPage('page-home');
+    }
+
+    function doLogin() {
+      var email = document.getElementById('login-email').value.trim();
+      var pass  = document.getElementById('login-password').value;
+      var err   = document.getElementById('login-error');
+      err.style.display = 'none';
+      if (!email || !pass) { err.textContent = 'Please enter email and password.'; err.style.display='block'; return; }
+      var users = _getUsers();
+      var user  = users.find(function(u){ return u.email===email && u.pass===pass; });
+      if (!user) { err.textContent = 'Incorrect email or password.'; err.style.display='block'; return; }
+      localStorage.setItem('ll_current_user', JSON.stringify({ name:user.name, email:user.email, contacts:user.contacts }));
+      var g = document.getElementById('home-user-greeting');
+      if (g) g.textContent = 'Welcome, ' + user.name.split(' ')[0] + ' \uD83D\uDC4B';
+      showPage('page-home');
+    }
+
+    function doLogout() {
+      localStorage.removeItem('ll_current_user');
+      showPage('page-auth');
+    }
+
+    function goToHome() {
+      var user = _getUser();
+      if (!user) { showPage('page-auth'); return; }
+      showPage('page-home');
+    }
+
+    function goToSelect() {
+      showPage('page-select');
+    }
+
+    function goToHistory() {
+      showPage('page-history');
+      // loadDispatchHistory is defined in app.js, call after short delay
+      setTimeout(function(){ if(typeof loadDispatchHistory==='function') loadDispatchHistory(); }, 100);
+    }
+
+    function goToMap(mode) {
+      showPage('page-map');
+      // initMapPage is defined in app.js
+      setTimeout(function(){ if(typeof initMapPage==='function') initMapPage(mode); }, 100);
+    }
+
+    function toggleMobileMapView() {
+      var body = document.getElementById('map-body');
+      var btn  = document.getElementById('map-toggle-btn');
+      if (!body) return;
+      var isMapView = body.classList.toggle('map-view-active');
+      if (btn) btn.textContent = isMapView ? '\u2630' : '\uD83D\uDDFA\uFE0F';
+      if (typeof map !== 'undefined' && map) setTimeout(function(){ map.invalidateSize(); }, 50);
+    }
+  </script>
 </head>
 <body>
 
 <!-- Theme Toggle -->
 <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark theme">
-  <span class="toggle-icon" id="theme-icon"></span>
+  <span class="toggle-icon" id="theme-icon">🌙</span>
 </button>
 
-<!-- PAGE 0  AUTH LANDING -->
+<!-- PAGE 0 — AUTH LANDING -->
 <div id="page-auth" class="page active">
   <div class="home-bg">
     <div class="grid-overlay"></div>
@@ -26,9 +143,9 @@
     <div class="road-line l1"></div>
     <div class="road-line l2"></div>
     <div class="road-line l3"></div>
-    <div class="moving-dot d1"></div>
-    <div class="moving-dot d2"></div>
-    <div class="moving-dot d3"></div>
+    <div class="moving-dot d1">🚑</div>
+    <div class="moving-dot d2">🚒</div>
+    <div class="moving-dot d3">🚗</div>
   </div>
   <div class="home-content">
     <div class="home-badge">AI-POWERED EMERGENCY ROUTING SYSTEM</div>
@@ -49,8 +166,8 @@
     </div>
   </div>
   <div class="home-footer">
-    <span>LifeLane AI</span><span></span>
-    <span>Spring Boot + WebSocket</span><span></span>
+    <span>LifeLane AI</span><span>·</span>
+    <span>Spring Boot + WebSocket</span><span>·</span>
     <span>RFID + Voice + IoT</span>
   </div>
 </div>
@@ -70,12 +187,12 @@
       </div>
       <div class="auth-field">
         <label class="auth-label">PASSWORD</label>
-        <input type="password" id="login-password" class="auth-input" placeholder="" autocomplete="current-password"/>
+        <input type="password" id="login-password" class="auth-input" placeholder="••••••••" autocomplete="current-password"/>
       </div>
       <div id="login-error" class="auth-error" style="display:none"></div>
-      <button class="auth-submit-btn" onclick="doLogin()">LOGIN </button>
+      <button class="auth-submit-btn" onclick="doLogin()">LOGIN →</button>
       <div class="auth-switch">Don't have an account? <span onclick="showPage('page-signup')">Create one</span></div>
-      <button class="auth-back-btn" onclick="showPage('page-auth')"> Back</button>
+      <button class="auth-back-btn" onclick="showPage('page-auth')">← Back</button>
     </div>
   </div>
 </div>
@@ -105,13 +222,13 @@
           <input type="password" id="signup-password" class="auth-input" placeholder="Min 6 characters" autocomplete="new-password"/>
         </div>
         <div id="signup-error1" class="auth-error" style="display:none"></div>
-        <button class="auth-submit-btn" onclick="signupStep1Next()">NEXT  Add Family Contacts </button>
+        <button class="auth-submit-btn" onclick="signupStep1Next()">NEXT — Add Family Contacts →</button>
       </div>
 
       <!-- STEP 2: Family Contacts -->
       <div id="signup-step2" style="display:none">
         <div class="auth-contacts-info">
-          <span class="auth-contacts-icon"></span>
+          <span class="auth-contacts-icon">👨‍👩‍👧‍👦</span>
           <div>
             <div class="auth-contacts-title">Family / Emergency Contacts</div>
             <div class="auth-contacts-desc">These 5 numbers will be alerted automatically if a crash is detected.</div>
@@ -120,19 +237,19 @@
         <div id="signup-contacts-fields"></div>
         <div id="signup-error2" class="auth-error" style="display:none"></div>
         <div style="display:flex;gap:8px;margin-top:6px;">
-          <button class="auth-back-step-btn" onclick="signupBackToStep1()"> Back</button>
-          <button class="auth-submit-btn" style="flex:1" onclick="doSignup()">CREATE ACCOUNT </button>
+          <button class="auth-back-step-btn" onclick="signupBackToStep1()">← Back</button>
+          <button class="auth-submit-btn" style="flex:1" onclick="doSignup()">CREATE ACCOUNT →</button>
         </div>
       </div>
 
       <div class="auth-switch">Already have an account? <span onclick="showPage('page-login')">Login</span></div>
-      <button class="auth-back-btn" onclick="showPage('page-auth')"> Back</button>
+      <button class="auth-back-btn" onclick="showPage('page-auth')">← Back</button>
     </div>
   </div>
 </div>
 
 
-<!-- PAGE 1  HOME (post-login) -->
+<!-- PAGE 1 — HOME (post-login) -->
 <div id="page-home" class="page">
   <div class="home-bg">
     <div class="grid-overlay"></div>
@@ -142,9 +259,9 @@
     <div class="road-line l1"></div>
     <div class="road-line l2"></div>
     <div class="road-line l3"></div>
-    <div class="moving-dot d1"></div>
-    <div class="moving-dot d2"></div>
-    <div class="moving-dot d3"></div>
+    <div class="moving-dot d1">🚑</div>
+    <div class="moving-dot d2">🚒</div>
+    <div class="moving-dot d3">🚗</div>
   </div>
   <div class="home-content">
     <div class="home-badge">AI-POWERED EMERGENCY ROUTING SYSTEM</div>
@@ -154,34 +271,34 @@
       <button class="logout-btn" onclick="doLogout()">Logout</button>
     </div>
     <div class="home-features">
-      <div class="feat"><span class="feat-icon"></span><span>Real Road Routing</span></div>
-      <div class="feat"><span class="feat-icon"></span><span>WebSocket Live Alerts</span></div>
-      <div class="feat"><span class="feat-icon"></span><span>IoT Signal Override</span></div>
-      <div class="feat"><span class="feat-icon"></span><span>Voice Input</span></div>
-      <div class="feat"><span class="feat-icon"></span><span>RFID Vehicle ID</span></div>
-      <div class="feat"><span class="feat-icon"></span><span>Voice Broadcast Alert</span></div>
+      <div class="feat"><span class="feat-icon">⚡</span><span>Real Road Routing</span></div>
+      <div class="feat"><span class="feat-icon">📡</span><span>WebSocket Live Alerts</span></div>
+      <div class="feat"><span class="feat-icon">🚦</span><span>IoT Signal Override</span></div>
+      <div class="feat"><span class="feat-icon">🎤</span><span>Voice Input</span></div>
+      <div class="feat"><span class="feat-icon">📻</span><span>RFID Vehicle ID</span></div>
+      <div class="feat"><span class="feat-icon">🔊</span><span>Voice Broadcast Alert</span></div>
     </div>
     <button class="btn-start" onclick="goToSelect()">
       <span>GET STARTED</span>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
     </button>
     <button class="btn-history" onclick="goToHistory()">
-      <span> DISPATCH HISTORY</span>
+      <span>📋 DISPATCH HISTORY</span>
     </button>
   </div>
   <div class="home-footer">
-    <span>LifeLane AI</span><span></span>
-    <span>Spring Boot + WebSocket</span><span></span>
+    <span>LifeLane AI</span><span>·</span>
+    <span>Spring Boot + WebSocket</span><span>·</span>
     <span>RFID + Voice + IoT</span>
   </div>
 </div>
 
 
-<!-- PAGE 2  MODE SELECT -->
+<!-- PAGE 2 — MODE SELECT -->
 <div id="page-select" class="page">
   <div class="home-bg"><div class="grid-overlay"></div></div>
   <div class="select-content">
-    <button class="back-btn" onclick="goToHome()"> Back</button>
+    <button class="back-btn" onclick="goToHome()">← Back</button>
     <div class="select-header">
       <div class="select-logo">Life<span>Lane</span> <em>AI</em></div>
       <h2 class="select-title">Select Routing Mode</h2>
@@ -190,21 +307,21 @@
     <div class="mode-cards">
       <div class="mode-card normal-card" onclick="goToMap('normal')">
         <div class="mode-card-bg normal-bg"></div>
-        <div class="mode-card-icon"></div>
+        <div class="mode-card-icon">🗺️</div>
         <div class="mode-card-body">
           <h3>Normal Routing</h3>
           <p>Navigate with full traffic awareness across real roads with congestion levels.</p>
           <ul class="mode-features">
-            <li><span class="dot-g"></span>Green  Low traffic (fastest)</li>
-            <li><span class="dot-o"></span>Orange  Medium traffic</li>
-            <li><span class="dot-r"></span>Red  High congestion</li>
+            <li><span class="dot-g"></span>Green — Low traffic (fastest)</li>
+            <li><span class="dot-o"></span>Orange — Medium traffic</li>
+            <li><span class="dot-r"></span>Red — High congestion</li>
           </ul>
         </div>
-        <div class="mode-card-action">Start Normal Route </div>
+        <div class="mode-card-action">Start Normal Route →</div>
       </div>
       <div class="mode-card emg-card" onclick="goToMap('emergency')">
         <div class="mode-card-bg emg-bg"></div>
-        <div class="mode-card-icon"></div>
+        <div class="mode-card-icon">🚨</div>
         <div class="mode-card-body">
           <h3>Emergency Routing</h3>
           <p>Priority dispatch with RFID ID, voice input, IoT signal override and voice broadcast alerts.</p>
@@ -214,30 +331,30 @@
             <li><span class="dot-red"></span>IoT signal clearing + voice broadcast</li>
           </ul>
         </div>
-        <div class="mode-card-action emg-action">Dispatch Emergency </div>
+        <div class="mode-card-action emg-action">Dispatch Emergency →</div>
       </div>
     </div>
   </div>
 </div>
 
 
-<!-- PAGE 3  MAP -->
+<!-- PAGE 3 — MAP -->
 <div id="page-map" class="page">
   <div id="map-topbar">
     <div class="topbar-left">
-      <button class="back-btn-small" onclick="goToSelect()"></button>
+      <button class="back-btn-small" onclick="goToSelect()">←</button>
       <div class="topbar-logo">Life<span>Lane</span></div>
       <div id="mode-badge" class="mode-badge normal">NORMAL</div>
     </div>
     <div class="topbar-center">
       <div id="ws-status" class="ws-indicator disconnected">
         <span class="ws-dot"></span>
-        <span id="ws-label">WS: Connecting</span>
+        <span id="ws-label">WS: Connecting…</span>
       </div>
     </div>
     <div class="topbar-right">
       <div id="clock-map" class="map-clock">--:--:--</div>
-      <button class="map-toggle-btn" id="map-toggle-btn" onclick="toggleMobileMapView()" title="Toggle map/sidebar"></button>
+      <button class="map-toggle-btn" id="map-toggle-btn" onclick="toggleMobileMapView()" title="Toggle map/sidebar">🗺️</button>
     </div>
   </div>
 
@@ -257,7 +374,7 @@
           </div>
           <div class="rfid-info">
             <div class="rfid-tag" id="rfid-tag-display">Tap card or scan</div>
-            <div class="rfid-vehicle-name" id="rfid-vehicle-name"></div>
+            <div class="rfid-vehicle-name" id="rfid-vehicle-name">—</div>
           </div>
           <button class="rfid-scan-btn" onclick="simulateRFIDScan()">Scan</button>
         </div>
@@ -266,10 +383,10 @@
       <div id="emg-type-panel" class="sidebar-section" style="display:none">
         <div class="s-label">VEHICLE TYPE</div>
         <div class="type-grid">
-          <div class="type-btn active" onclick="selectEmgType(this,'AMBULANCE')"><span></span><small>Ambulance</small></div>
-          <div class="type-btn" onclick="selectEmgType(this,'FIRE_TRUCK')"><span></span><small>Fire Truck</small></div>
-          <div class="type-btn" onclick="selectEmgType(this,'POLICE')"><span></span><small>Police</small></div>
-          <div class="type-btn" onclick="selectEmgType(this,'HAZMAT')"><span></span><small>Hazmat</small></div>
+          <div class="type-btn active" onclick="selectEmgType(this,'AMBULANCE')"><span>🚑</span><small>Ambulance</small></div>
+          <div class="type-btn" onclick="selectEmgType(this,'FIRE_TRUCK')"><span>🚒</span><small>Fire Truck</small></div>
+          <div class="type-btn" onclick="selectEmgType(this,'POLICE')"><span>🚓</span><small>Police</small></div>
+          <div class="type-btn" onclick="selectEmgType(this,'HAZMAT')"><span>☣️</span><small>Hazmat</small></div>
         </div>
       </div>
 
@@ -277,11 +394,9 @@
         <div class="s-label">PICKUP / SOURCE</div>
         <div class="location-input-wrap" id="src-wrap">
           <span class="loc-dot src-dot"></span>
-          <input type="text" id="src-input" class="loc-input"
-                 placeholder="Search or speak pickup location"
-                 oninput="onLocationInput('src')" autocomplete="off"/>
-          <button class="loc-voice-btn" id="src-voice-btn" onclick="startVoiceInput('src')" title="Voice input"></button>
-          <button class="loc-gps-btn" onclick="useMyLocation('src')" title="Use my location"></button>
+          <input type="text" id="src-input" class="loc-input" placeholder="Search or speak pickup location…" oninput="onLocationInput('src')" autocomplete="off"/>
+          <button class="loc-voice-btn" id="src-voice-btn" onclick="startVoiceInput('src')" title="Voice input">🎤</button>
+          <button class="loc-gps-btn" onclick="useMyLocation('src')" title="Use my location">◎</button>
         </div>
         <div class="voice-status-bar" id="src-voice-status"></div>
         <div class="autocomplete-list" id="src-auto"></div>
@@ -291,10 +406,8 @@
         <div class="s-label">DROP-OFF / DESTINATION</div>
         <div class="location-input-wrap" id="dst-wrap">
           <span class="loc-dot dst-dot"></span>
-          <input type="text" id="dst-input" class="loc-input"
-                 placeholder="Search or speak destination"
-                 oninput="onLocationInput('dst')" autocomplete="off"/>
-          <button class="loc-voice-btn" id="dst-voice-btn" onclick="startVoiceInput('dst')" title="Voice input"></button>
+          <input type="text" id="dst-input" class="loc-input" placeholder="Search or speak destination…" oninput="onLocationInput('dst')" autocomplete="off"/>
+          <button class="loc-voice-btn" id="dst-voice-btn" onclick="startVoiceInput('dst')" title="Voice input">🎤</button>
         </div>
         <div class="voice-status-bar" id="dst-voice-status"></div>
         <div class="autocomplete-list" id="dst-auto"></div>
@@ -302,19 +415,18 @@
 
       <div id="alert-msg-panel" class="sidebar-section" style="display:none">
         <div class="s-label">BROADCAST ALERT MESSAGE</div>
-        <textarea id="alert-msg" class="alert-textarea"
-          placeholder="Alert message sent via WebSocket + voice to all nearby vehicles"> Emergency vehicle approaching  please clear the road immediately!</textarea>
+        <textarea id="alert-msg" class="alert-textarea" placeholder="Alert message sent via WebSocket + voice to all nearby vehicles…">🚨 Emergency vehicle approaching — please clear the road immediately!</textarea>
         <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="voice-test-btn" onclick="testVoiceAlert()"> Test Voice Alert</button>
-          <button class="voice-test-btn" style="flex:1" onclick="stopVoiceAlert()"> Stop</button>
+          <button class="voice-test-btn" onclick="testVoiceAlert()">🔊 Test Voice Alert</button>
+          <button class="voice-test-btn" style="flex:1" onclick="stopVoiceAlert()">⏹ Stop</button>
         </div>
       </div>
 
       <div class="sidebar-section">
         <button id="route-btn" class="route-btn normal-mode" onclick="calculateRoute()">
-          <span id="route-btn-txt"> FIND ROUTES</span>
+          <span id="route-btn-txt">🗺️ FIND ROUTES</span>
         </button>
-        <button class="clear-btn" onclick="clearAll()"> CLEAR MAP</button>
+        <button class="clear-btn" onclick="clearAll()">✕ CLEAR MAP</button>
       </div>
 
       <div id="route-results" class="sidebar-section" style="display:none">
@@ -341,11 +453,11 @@
 </div><!-- /page-map -->
 
 
-<!-- PAGE 4  DISPATCH HISTORY -->
+<!-- PAGE 4 — DISPATCH HISTORY -->
 <div id="page-history" class="page">
   <div class="home-bg"><div class="grid-overlay"></div></div>
   <div class="history-content">
-    <button class="back-btn" onclick="goToHome()"> Back</button>
+    <button class="back-btn" onclick="goToHome()">← Back</button>
     <div class="history-header">
       <div class="select-logo">Life<span>Lane</span> <em>AI</em></div>
       <h2 class="select-title">Dispatch History</h2>
@@ -354,7 +466,7 @@
     <div id="history-stats" class="history-stats"></div>
     <div id="history-list" class="history-list">
       <div class="history-loading">
-        <span class="spinner"></span> Loading records
+        <span class="spinner"></span> Loading records…
       </div>
     </div>
   </div>
@@ -366,7 +478,7 @@
 <!-- Voice listening overlay -->
 <div id="voice-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;flex-direction:column;gap:16px">
   <div class="voice-listen-ring"></div>
-  <div style="font-family:'Syne',sans-serif;font-size:18px;color:#fff;letter-spacing:2px" id="voice-overlay-label">LISTENING</div>
+  <div style="font-family:'Syne',sans-serif;font-size:18px;color:#fff;letter-spacing:2px" id="voice-overlay-label">LISTENING…</div>
   <div style="font-size:13px;color:rgba(255,255,255,0.5);font-family:'JetBrains Mono',monospace" id="voice-overlay-transcript"></div>
   <button onclick="stopVoiceInput()" style="margin-top:8px;background:rgba(255,32,32,0.2);border:1px solid rgba(255,32,32,0.5);color:#ff2020;padding:8px 24px;border-radius:20px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px">CANCEL</button>
 </div>
