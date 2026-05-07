@@ -1,7 +1,6 @@
 package com.lifelane.lifelane_ai.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
 
 @Entity
 public class Route {
@@ -10,73 +9,49 @@ public class Route {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // original fields
     private String type;
-    private int traffic;
+    private int trafficLevel;
     private int time;
     private String color;
-
-    @Column(length = 600)
-    private String aiExplanation;
-
-    // dispatch record fields
-    private String sourceName;
-    private String destName;
-    private Double distanceKm;
-    private Integer durationMin;
-    private String routeType;      // NORMAL or EMERGENCY
-    private String vehicleType;    // AMBULANCE, FIRE_TRUCK, POLICE, HAZMAT, NORMAL
+    private String source;
+    private String destination;
+    private String mode;
+    private String vehicleType;
     private String rfidTag;
-    private LocalDateTime dispatchedAt;
+    private double distance;
+    private String createdAt;
 
     public Route() {}
 
-    public Route(String type, int traffic, int time, String color) {
+    public Route(String type, int trafficLevel, int time, String color) {
         this.type = type;
-        this.traffic = traffic;
+        this.trafficLevel = trafficLevel;
         this.time = time;
         this.color = color;
     }
 
-    // getters & setters
     public Long getId() { return id; }
-
     public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
-
-    public int getTraffic() { return traffic; }
-    public void setTraffic(int traffic) { this.traffic = traffic; }
-
+    public int getTrafficLevel() { return trafficLevel; }
     public int getTime() { return time; }
-    public void setTime(int time) { this.time = time; }
-
     public String getColor() { return color; }
-    public void setColor(String color) { this.color = color; }
-
-    public String getAiExplanation() { return aiExplanation; }
-    public void setAiExplanation(String aiExplanation) { this.aiExplanation = aiExplanation; }
-
-    public String getSourceName() { return sourceName; }
-    public void setSourceName(String sourceName) { this.sourceName = sourceName; }
-
-    public String getDestName() { return destName; }
-    public void setDestName(String destName) { this.destName = destName; }
-
-    public Double getDistanceKm() { return distanceKm; }
-    public void setDistanceKm(Double distanceKm) { this.distanceKm = distanceKm; }
-
-    public Integer getDurationMin() { return durationMin; }
-    public void setDurationMin(Integer durationMin) { this.durationMin = durationMin; }
-
-    public String getRouteType() { return routeType; }
-    public void setRouteType(String routeType) { this.routeType = routeType; }
-
+    public String getSource() { return source; }
+    public String getDestination() { return destination; }
+    public String getMode() { return mode; }
     public String getVehicleType() { return vehicleType; }
-    public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
-
     public String getRfidTag() { return rfidTag; }
-    public void setRfidTag(String rfidTag) { this.rfidTag = rfidTag; }
+    public double getDistance() { return distance; }
+    public String getCreatedAt() { return createdAt; }
 
-    public LocalDateTime getDispatchedAt() { return dispatchedAt; }
-    public void setDispatchedAt(LocalDateTime dispatchedAt) { this.dispatchedAt = dispatchedAt; }
+    public void setType(String type) { this.type = type; }
+    public void setTrafficLevel(int trafficLevel) { this.trafficLevel = trafficLevel; }
+    public void setTime(int time) { this.time = time; }
+    public void setColor(String color) { this.color = color; }
+    public void setSource(String source) { this.source = source; }
+    public void setDestination(String destination) { this.destination = destination; }
+    public void setMode(String mode) { this.mode = mode; }
+    public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
+    public void setRfidTag(String rfidTag) { this.rfidTag = rfidTag; }
+    public void setDistance(double distance) { this.distance = distance; }
+    public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 }
