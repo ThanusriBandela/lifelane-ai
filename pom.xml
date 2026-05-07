@@ -55,6 +55,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- SPRING MAIL (Gmail SMTP) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- TEST -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

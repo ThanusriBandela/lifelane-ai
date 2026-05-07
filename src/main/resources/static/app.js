@@ -25,6 +25,12 @@ function realisticEta(osrmSeconds, distanceMeters, emergency) {
 }
 
 
+function _syncThemeUI(theme) {
+  const icon = document.getElementById('theme-icon');
+  if (!icon) return;
+  icon.textContent = theme === 'light' ? '☀️' : '🌙';
+}
+
 (function initTheme() {
   const saved = localStorage.getItem('lifelane-theme') || 'dark';
   if (saved === 'light') {
@@ -41,17 +47,9 @@ function toggleTheme() {
   // Swap map tiles if map is active
   if (map && S.tileLayer) {
     map.removeLayer(S.tileLayer);
-    const url = isLight
-      ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    const url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
     S.tileLayer = L.tileLayer(url, {attribution:'© OpenStreetMap © CARTO', maxZoom:19}).addTo(map);
   }
-}
-
-function _syncThemeUI(theme) {
-  const icon = document.getElementById('theme-icon');
-  if (!icon) return;
-  icon.textContent = theme === 'light' ? '☀️' : '🌙';
 }
 
 // Auto-detects: empty string = same origin (works on Render)
@@ -103,6 +101,19 @@ function initMapPage(mode) {
     routeBtn.className='route-btn normal-mode'; routeBtnTxt.textContent='🗺️ FIND ROUTES';
     emgPanel.style.display='none'; alertPanel.style.display='none'; rfidPanel.style.display='none';
   }
+  // Crash panel: always visible in normal mode, hidden in emergency
+  const crashPanel = document.getElementById('crash-alert-panel');
+  if (crashPanel) {
+    crashPanel.style.display = (mode === 'normal') ? 'block' : 'none';
+    if (mode === 'normal') {
+      renderCrashContactsPreview();
+      // ✅ FIX: Start crash detection immediately when entering normal mode
+      // Accelerometer works right away — does not need a route to be set
+      startCrashDetection();
+    } else {
+      stopCrashDetection();
+    }
+  }
   if (!map) {
     map=L.map('map',{center:[17.45,78.36],zoom:13});
     S.tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(map);
@@ -140,34 +151,103 @@ function selectEmgTypeByName(type) {
   S.emgType=type;
   document.querySelectorAll('.type-btn').forEach(function(b){ const sm=b.querySelector('small'); if(!sm) return; b.classList.toggle('active',sm.textContent.toUpperCase().replace(' ','_')===type||sm.textContent.toUpperCase()===type.replace('_',' ')); });
 }
+async function registerUser() {
+  const name     = document.getElementById("signup-name").value.trim();
+  const email    = document.getElementById("signup-email").value.trim();
+  const password = document.getElementById("signup-password").value;
+  const c1name   = document.getElementById("contact1-name").value.trim();
+  const c1email  = document.getElementById("contact1-email").value.trim();
+  const c2name   = document.getElementById("contact2-name").value.trim();
+  const c2email  = document.getElementById("contact2-email").value.trim();
+
+  if (!name || !email || !password) { showToast('warning', 'Please fill in name, email and password'); return; }
+  if (!c1email && !c2email) { showToast('warning', 'Add at least one emergency contact email address'); return; }
+
+  const userObj = { name, email, password, contact1Name: c1name, contact1Email: c1email, contact2Name: c2name, contact2Email: c2email };
+
+  try {
+    const res = await fetch(API_BASE + '/api/users/register', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(userObj)
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast('warning', data.error || 'Registration failed'); return; }
+
+    // Also cache locally as fallback
+    const accounts = JSON.parse(localStorage.getItem('lifelane-accounts') || '{}');
+    accounts[email] = userObj;
+    localStorage.setItem('lifelane-accounts', JSON.stringify(accounts));
+
+    showToast('success', 'Account created! Please sign in.');
+    showPage("page-login");
+  } catch(e) {
+    // Offline fallback
+    const accounts = JSON.parse(localStorage.getItem('lifelane-accounts') || '{}');
+    if (accounts[email]) { showToast('warning', 'Email already registered'); return; }
+    accounts[email] = userObj;
+    localStorage.setItem('lifelane-accounts', JSON.stringify(accounts));
+    showToast('success', 'Account saved locally. Please sign in.');
+    showPage("page-login");
+  }
+}
 
 /* ══ VOICE INPUT ═══════════════════════════════════════════════ */
 function startVoiceInput(which) {
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if (!SR) { showToast('warning','Voice input not supported. Use Chrome.'); return; }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('warning', 'Voice input not supported in this browser. Use Chrome.');
+    return;
+  }
+
+  /* stop any previous session */
   stopVoiceInput();
-  S.voiceWhich=which;
-  const rec=new SR(); rec.lang='en-IN'; rec.interimResults=true; rec.maxAlternatives=1; S.voiceRecognition=rec;
-  const btn=document.getElementById(which+'-voice-btn'), statusBar=document.getElementById(which+'-voice-status');
-  const overlay=document.getElementById('voice-overlay'), overlayLbl=document.getElementById('voice-overlay-label');
-  const overlayTxt=document.getElementById('voice-overlay-transcript');
-  if(btn) btn.classList.add('listening');
-  if(statusBar){statusBar.textContent='🎤 Listening…';statusBar.classList.add('active');}
-  if(overlay) overlay.classList.add('show');
-  if(overlayLbl) overlayLbl.textContent='SAY THE LOCATION…';
-  if(overlayTxt) overlayTxt.textContent='';
-  rec.onresult=function(event){
-    let t=''; for(let i=event.resultIndex;i<event.results.length;i++) t+=event.results[i][0].transcript;
-    if(overlayTxt) overlayTxt.textContent='"'+t+'"';
-    if(event.results[event.results.length-1].isFinal){
-      const inputEl=document.getElementById(which+'-input'); if(inputEl){inputEl.value=t;onLocationInput(which);}
-      addLog('info','VOICE',(which==='src'?'Source':'Destination')+' heard: "'+t+'"');
+
+  S.voiceWhich = which;
+  const rec = new SpeechRecognition();
+  rec.lang = 'en-IN';
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  S.voiceRecognition = rec;
+
+  const btn         = document.getElementById(which + '-voice-btn');
+  const statusBar   = document.getElementById(which + '-voice-status');
+  const overlay     = document.getElementById('voice-overlay');
+  const overlayLbl  = document.getElementById('voice-overlay-label');
+  const overlayTxt  = document.getElementById('voice-overlay-transcript');
+
+  if (btn) btn.classList.add('listening');
+  if (statusBar) { statusBar.textContent = '🎤 Listening…'; statusBar.classList.add('active'); }
+  if (overlay)   { overlay.classList.add('show'); }
+  if (overlayLbl) overlayLbl.textContent = 'SAY THE LOCATION…';
+  if (overlayTxt) overlayTxt.textContent = '';
+
+  rec.onresult = function(event) {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    if (overlayTxt) overlayTxt.textContent = '"' + transcript + '"';
+
+    if (event.results[event.results.length - 1].isFinal) {
+      /* fill the input and trigger autocomplete */
+      const inputEl = document.getElementById(which + '-input');
+      if (inputEl) {
+        inputEl.value = transcript;
+        onLocationInput(which);
+      }
+      addLog('info', 'VOICE', (which === 'src' ? 'Source' : 'Destination') + ' heard: "' + transcript + '"');
       stopVoiceInput();
-      if(which==='src'&&S.mode==='emergency'){ setTimeout(()=>{ speak('Source heard. Now say your destination.'); setTimeout(()=>startVoiceInput('dst'),2000); },600); }
     }
   };
-  rec.onerror=function(e){showToast('warning','Voice error: '+e.error);stopVoiceInput();};
-  rec.onend=function(){stopVoiceInput();};
+
+  rec.onerror = function(e) {
+    showToast('warning', 'Voice error: ' + e.error);
+    stopVoiceInput();
+  };
+
+  rec.onend = function() { stopVoiceInput(); };
+
   rec.start();
 }
 function stopVoiceInput() {
@@ -176,7 +256,35 @@ function stopVoiceInput() {
   ['src','dst'].forEach(function(w){ const btn=document.getElementById(w+'-voice-btn'),bar=document.getElementById(w+'-voice-status'); if(btn) btn.classList.remove('listening'); if(bar){bar.textContent='';bar.classList.remove('active');} });
   S.voiceWhich=null;
 }
+async function loginUser() {
+  const email    = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  if (!email || !password) { showToast('warning', 'Enter email and password'); return; }
 
+  try {
+    const res = await fetch(API_BASE + '/api/users/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast('warning', data.error || 'Invalid email or password'); return; }
+
+    localStorage.setItem('user', JSON.stringify(data));
+    const nameEl = document.getElementById('user-chip-name');
+    if (nameEl && data.name) nameEl.textContent = data.name.split(' ')[0];
+    showToast('success', 'Welcome back, ' + (data.name ? data.name.split(' ')[0] : 'User') + '!');
+    showPage("page-select");
+  } catch(e) {
+    // Offline fallback — use localStorage
+    const accounts = JSON.parse(localStorage.getItem('lifelane-accounts') || '{}');
+    const user = accounts[email];
+    if (!user || user.password !== password) { showToast('warning', 'Invalid email or password'); return; }
+    localStorage.setItem('user', JSON.stringify(user));
+    showToast('success', 'Welcome back (offline), ' + (user.name ? user.name.split(' ')[0] : 'User') + '!');
+    showPage("page-select");
+  }
+}
 /* ══ VOICE TTS ════════════════════════════════════════════════ */
 function speak(text,opts) {
   if(!S.voiceSynth) return; opts=opts||{};
@@ -219,13 +327,13 @@ function pickLocation(which,lat,lon,name) {
   else{document.getElementById('dst-input').value=sn;document.getElementById('dst-auto').classList.remove('open');setDstLatLng(parseFloat(lat),parseFloat(lon),name);}
 }
 function setSrcLatLng(lat,lng,name) {
-  S.src={lat,lng,name:name||'Source'}; if(S.srcMarker) map.removeLayer(S.srcMarker);
+  S.src={lat,lng,name:name||'Source'}; if(S.srcMarker) map.removeLayer(S.srcMarker); setTimeout(checkCrashPanelVisibility, 100);
   S.srcMarker=L.circleMarker([lat,lng],{radius:11,color:'#00d95f',fillColor:'#00d95f',fillOpacity:0.9,weight:2}).addTo(map).bindPopup('<div class="pop-t">Source</div><div class="pop-r">'+(name||'')+'</div>');
   map.setView([lat,lng],14); document.getElementById('src-input').value=(name||'').split(',')[0];
   addLog('success','SOURCE','Set: '+(name||'').split(',')[0]); speak('Source set to '+(name||'').split(',')[0]);
 }
 function setDstLatLng(lat,lng,name) {
-  S.dst={lat,lng,name:name||'Destination'}; if(S.dstMarker) map.removeLayer(S.dstMarker);
+  S.dst={lat,lng,name:name||'Destination'}; if(S.dstMarker) map.removeLayer(S.dstMarker); setTimeout(checkCrashPanelVisibility, 100);
   S.dstMarker=L.circleMarker([lat,lng],{radius:11,color:'#ff2020',fillColor:'#ff2020',fillOpacity:0.9,weight:2}).addTo(map).bindPopup('<div class="pop-t">Destination</div><div class="pop-r">'+(name||'')+'</div>');
   addLog('success','DEST','Set: '+(name||'').split(',')[0]); speak('Destination set to '+(name||'').split(',')[0]);
 }
@@ -493,6 +601,8 @@ function clearRoutes() {
 }
 function clearAll() {
   clearRoutes(); stopVoiceAlert();
+  // Keep crash panel visible in normal mode after clearing
+  setTimeout(checkCrashPanelVisibility, 50);
   if(S.srcMarker){map.removeLayer(S.srcMarker);S.srcMarker=null;} if(S.dstMarker){map.removeLayer(S.dstMarker);S.dstMarker=null;}
   S.src=null;S.dst=null;S.rfidTag=null;
   ['src-input','dst-input'].forEach(id=>{var el=document.getElementById(id);if(el)el.value='';});
@@ -569,6 +679,7 @@ async function fetchGroqAI(emergency) {
     console.warn('[GroqAI] Skipped:', e.message);
   }
 }
+/* loginUser and registerUser are defined earlier — localStorage-based auth */
 
 /* ══ DISPATCH HISTORY ═════════════════════════════════════════ */
 async function loadDispatchHistory() {
@@ -657,278 +768,316 @@ function formatTimestamp(raw) {
 }
 
 /* ══ DISPATCH HISTORY ═════════════════════════════════════════ */
-window.onload=function(){showPage('page-home');};
+window.onload = function() {
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (user) {
+    try {
+      const nameEl = document.getElementById('user-chip-name');
+      if (nameEl && user.name) nameEl.textContent = user.name.split(' ')[0];
+    } catch(e) {}
+    showPage('page-select');
+  } else {
+    showPage('page-home');
+  }
+};
 
-// ============================================================
-// EMERGENCY CONTACTS + CRASH DETECTION MODULE
-// ============================================================
 
-// --- State ---
-let crashDetectionActive = false;
-let crashCountdownTimer = null;
-let lastSpeed = 0;
-let lastSpeedTime = Date.now();
-let watchId = null;
-const CRASH_G_THRESHOLD = 15;   // m/s² — sudden jolt (real crash ~30-50g)
-const CRASH_SPEED_DROP = 40;    // km/h drop within 2 seconds
-const CRASH_COUNTDOWN = 15;     // seconds before auto-send
+/* ══════════════════════════════════════════════════════════════
+   CRASH DETECTION MODULE
+   - DeviceMotion API: detects real G-force spike (accelerometer)
+   - GPS speed drop: detects sudden speed drop while navigating
+   - On detection: 10-sec countdown → if not cancelled → sends SMS
+   - Manual button: user can also trigger manually
+══════════════════════════════════════════════════════════════ */
 
-// --- Contacts Panel HTML (inject into sidebar) ---
-function injectContactsPanel() {
-    const sidebar = document.getElementById('sidebar');
-    if (!sidebar || document.getElementById('contacts-panel')) return;
+const CRASH = {
+  watching: false,
+  lastSpeed: null,
+  countdown: null,
+  countdownTimer: null,
+  G_THRESHOLD: 25,        // m/s² — ~2.5G, typical crash impact
+  SPEED_DROP_KMH: 30,     // km/h sudden drop to trigger
+  COUNTDOWN_SEC: 10,
+};
 
-    const panel = document.createElement('div');
-    panel.id = 'contacts-panel';
-    panel.className = 'sidebar-section';
-    panel.innerHTML = `
-        <div class="s-label" style="display:flex;justify-content:space-between;align-items:center;">
-            <span>EMERGENCY CONTACTS</span>
-            <button onclick="openAddContactModal()" style="background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.4);color:#ff5050;padding:2px 10px;border-radius:8px;cursor:pointer;font-size:11px;font-family:inherit;">+ ADD</button>
-        </div>
-        <div id="contacts-list" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;"></div>
-        <div style="margin-top:8px;display:flex;gap:6px;">
-            <button onclick="toggleCrashDetection()" id="crash-detect-btn"
-                style="flex:1;padding:7px;background:rgba(255,200,0,0.12);border:1px solid rgba(255,200,0,0.4);color:#ffc800;border-radius:8px;cursor:pointer;font-size:11px;font-family:inherit;letter-spacing:1px;">
-                ⚡ CRASH DETECTION: OFF
-            </button>
-        </div>
-        <div id="crash-countdown-bar" style="display:none;margin-top:8px;padding:10px;background:rgba(255,40,40,0.15);border:1px solid rgba(255,40,40,0.5);border-radius:8px;text-align:center;">
-            <div style="color:#ff4040;font-size:13px;font-weight:600;letter-spacing:1px;">🚨 CRASH DETECTED</div>
-            <div style="color:rgba(255,255,255,0.7);font-size:11px;margin-top:4px;">Sending alert in <span id="crash-countdown-num">15</span>s</div>
-            <button onclick="cancelCrashAlert()" style="margin-top:6px;padding:5px 16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:6px;cursor:pointer;font-size:11px;">I'm OK — Cancel</button>
-        </div>
-    `;
-    sidebar.insertBefore(panel, sidebar.querySelector('.grow') || sidebar.lastElementChild);
-    loadContacts();
-}
+/* ── Start monitoring (called when normal routing starts) ── */
+function startCrashDetection() {
+  if (CRASH.watching) return;
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!user || S.mode !== 'normal') return;
 
-// --- Load & Render Contacts ---
-function loadContacts() {
-    fetch(API_BASE+'/api/contacts?driver=driver1')
-        .then(r => r.json())
-        .then(contacts => renderContacts(contacts))
-        .catch(() => renderContacts([]));
-}
+  CRASH.watching = true;
+  console.log('[CRASH] Detection started');
 
-function renderContacts(contacts) {
-    const list = document.getElementById('contacts-list');
-    if (!list) return;
-    if (contacts.length === 0) {
-        list.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">No contacts added yet.</div>';
-        return;
-    }
-    list.innerHTML = contacts.map(c => `
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.1);border-radius:8px;">
-            <div style="width:30px;height:30px;border-radius:50%;background:rgba(100,120,255,0.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#8899ff;flex-shrink:0;">
-                ${c.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
-            </div>
-            <div style="flex:1;min-width:0;">
-                <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
-                <div style="font-size:10px;color:rgba(255,255,255,0.4);">${c.phone || c.email || ''} · ${c.relationship || ''}</div>
-            </div>
-            <button onclick="deleteContact(${c.id})" style="background:none;border:none;color:rgba(255,80,80,0.5);cursor:pointer;font-size:14px;padding:2px 4px;">✕</button>
-        </div>
-    `).join('');
-}
-
-function deleteContact(id) {
-    fetch(API_BASE+'/api/contacts/' + id, { method: 'DELETE' })
-        .then(() => loadContacts());
-}
-
-// --- Add Contact Modal ---
-function openAddContactModal() {
-    if (document.getElementById('add-contact-modal')) return;
-    const modal = document.createElement('div');
-    modal.id = 'add-contact-modal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = `
-        <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:24px;width:320px;font-family:inherit;">
-            <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:16px;letter-spacing:1px;">ADD EMERGENCY CONTACT</div>
-            <input id="ec-name" type="text" placeholder="Full name" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px 12px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:13px;font-family:inherit;"/>
-            <input id="ec-phone" type="tel" placeholder="Phone number" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px 12px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:13px;font-family:inherit;"/>
-            <input id="ec-email" type="email" placeholder="Email (optional)" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px 12px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:13px;font-family:inherit;"/>
-            <select id="ec-rel" style="width:100%;box-sizing:border-box;margin-bottom:16px;padding:9px 12px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:13px;font-family:inherit;">
-                <option value="FAMILY">Family</option>
-                <option value="FRIEND">Friend</option>
-                <option value="COLLEAGUE">Colleague</option>
-            </select>
-            <div style="display:flex;gap:8px;">
-                <button onclick="saveContact()" style="flex:1;padding:10px;background:rgba(255,80,80,0.2);border:1px solid rgba(255,80,80,0.5);color:#ff5050;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">Save</button>
-                <button onclick="document.getElementById('add-contact-modal').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;">Cancel</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    document.getElementById('ec-name').focus();
-}
-
-function saveContact() {
-    const name = document.getElementById('ec-name').value.trim();
-    const phone = document.getElementById('ec-phone').value.trim();
-    const email = document.getElementById('ec-email').value.trim();
-    const relationship = document.getElementById('ec-rel').value;
-    if (!name) { alert('Please enter a name'); return; }
-
-    fetch(API_BASE+'/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverName: 'driver1', name, phone, email, relationship })
-    })
-    .then(() => {
-        document.getElementById('add-contact-modal').remove();
-        loadContacts();
-    });
-}
-
-// --- Crash Detection ---
-function toggleCrashDetection() {
-    crashDetectionActive = !crashDetectionActive;
-    const btn = document.getElementById('crash-detect-btn');
-    if (crashDetectionActive) {
-        btn.style.background = 'rgba(255,80,0,0.2)';
-        btn.style.borderColor = 'rgba(255,80,0,0.6)';
-        btn.style.color = '#ff6030';
-        btn.textContent = '⚡ CRASH DETECTION: ON';
-        startAccelerometer();
-        startGPSSpeedMonitor();
-        showToast('Crash detection active', 'info');
-    } else {
-        btn.style.background = 'rgba(255,200,0,0.12)';
-        btn.style.borderColor = 'rgba(255,200,0,0.4)';
-        btn.style.color = '#ffc800';
-        btn.textContent = '⚡ CRASH DETECTION: OFF';
-        stopAccelerometer();
-        stopGPSSpeedMonitor();
-        showToast('Crash detection disabled', 'warn');
-    }
-}
-
-// Accelerometer — detects sudden jolt
-function startAccelerometer() {
-    if (typeof DeviceMotionEvent === 'undefined') return;
-
-    // iOS 13+ requires permission
+  // 1. Accelerometer — DeviceMotion (works on Android Chrome, iOS needs permission)
+  if (window.DeviceMotionEvent) {
     if (typeof DeviceMotionEvent.requestPermission === 'function') {
-        DeviceMotionEvent.requestPermission().then(state => {
-            if (state === 'granted') window.addEventListener('devicemotion', onDeviceMotion);
-        });
+      // iOS 13+ requires explicit permission
+      DeviceMotionEvent.requestPermission()
+        .then(state => { if (state === 'granted') window.addEventListener('devicemotion', onDeviceMotion); })
+        .catch(() => {});
     } else {
-        window.addEventListener('devicemotion', onDeviceMotion);
+      window.addEventListener('devicemotion', onDeviceMotion);
     }
+  }
+
+  // 2. GPS speed monitor — checks every 3s while navigating
+  CRASH.gpsWatcher = navigator.geolocation.watchPosition(onGpsUpdate, null, {
+    enableHighAccuracy: true, maximumAge: 1000
+  });
 }
 
-function stopAccelerometer() {
-    window.removeEventListener('devicemotion', onDeviceMotion);
+function stopCrashDetection() {
+  if (!CRASH.watching) return;
+  CRASH.watching = false;
+  window.removeEventListener('devicemotion', onDeviceMotion);
+  if (CRASH.gpsWatcher != null) navigator.geolocation.clearWatch(CRASH.gpsWatcher);
+  cancelCrashCountdown();
+  console.log('[CRASH] Detection stopped');
 }
 
-function onDeviceMotion(event) {
-    if (!crashDetectionActive || crashCountdownTimer) return;
-    const acc = event.acceleration;
-    if (!acc) return;
-    const g = Math.sqrt((acc.x||0)**2 + (acc.y||0)**2 + (acc.z||0)**2);
-    if (g > CRASH_G_THRESHOLD) {
-        console.log('[CrashDetect] Impact detected, G-force:', g.toFixed(1));
-        triggerCrashCountdown('Impact detected (G-force: ' + g.toFixed(1) + 'm/s²)');
+/* ── DeviceMotion handler ── */
+function onDeviceMotion(e) {
+  const acc = e.accelerationIncludingGravity;
+  if (!acc) return;
+  const magnitude = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
+  if (magnitude > CRASH.G_THRESHOLD) {
+    console.log('[CRASH] Impact detected! G-force magnitude:', magnitude.toFixed(1));
+    startCrashCountdown('impact');
+  }
+}
+
+/* ── GPS speed handler ── */
+let _lastGpsSpeed = null;
+function onGpsUpdate(pos) {
+  const speedMs = pos.coords.speed;
+  if (speedMs === null || speedMs === undefined) return;
+  const speedKmh = speedMs * 3.6;
+
+  if (_lastGpsSpeed !== null) {
+    const drop = _lastGpsSpeed - speedKmh;
+    if (_lastGpsSpeed > 20 && drop > CRASH.SPEED_DROP_KMH) {
+      console.log('[CRASH] Speed drop detected:', _lastGpsSpeed.toFixed(1), '→', speedKmh.toFixed(1), 'km/h');
+      startCrashCountdown('speed');
     }
+  }
+  _lastGpsSpeed = speedKmh;
 }
 
-// GPS speed monitor — detects sudden speed drop
-function startGPSSpeedMonitor() {
-    if (!navigator.geolocation) return;
-    watchId = navigator.geolocation.watchPosition(pos => {
-        if (!crashDetectionActive || crashCountdownTimer) return;
-        const speedKmh = (pos.coords.speed || 0) * 3.6;
-        const now = Date.now();
-        const elapsed = (now - lastSpeedTime) / 1000;
+/* ── Countdown ── */
+function startCrashCountdown(reason) {
+  if (CRASH.countdown !== null) return; // already counting
+  CRASH.countdown = CRASH.COUNTDOWN_SEC;
 
-        if (elapsed < 3 && lastSpeed > 30 && speedKmh < (lastSpeed - CRASH_SPEED_DROP)) {
-            console.log('[CrashDetect] Speed drop detected:', lastSpeed.toFixed(0), '→', speedKmh.toFixed(0), 'km/h');
-            triggerCrashCountdown('Sudden speed drop: ' + lastSpeed.toFixed(0) + '→' + speedKmh.toFixed(0) + ' km/h');
-        }
-        lastSpeed = speedKmh;
-        lastSpeedTime = now;
-    }, null, { enableHighAccuracy: true, maximumAge: 0 });
+  // Show countdown overlay
+  showCrashCountdownUI(reason);
+
+  CRASH.countdownTimer = setInterval(() => {
+    CRASH.countdown--;
+    updateCrashCountdownUI(CRASH.countdown);
+    if (CRASH.countdown <= 0) {
+      clearInterval(CRASH.countdownTimer);
+      CRASH.countdownTimer = null;
+      CRASH.countdown = null;
+      hideCrashCountdownUI();
+      confirmCrashAlert(); // auto-fire alert
+    }
+  }, 1000);
 }
 
-function stopGPSSpeedMonitor() {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
+function cancelCrashCountdown() {
+  if (CRASH.countdownTimer) { clearInterval(CRASH.countdownTimer); CRASH.countdownTimer = null; }
+  CRASH.countdown = null;
+  hideCrashCountdownUI();
 }
 
-// Countdown after crash detected
-function triggerCrashCountdown(reason) {
-    const bar = document.getElementById('crash-countdown-bar');
-    if (bar) bar.style.display = 'block';
-    let secs = CRASH_COUNTDOWN;
-    document.getElementById('crash-countdown-num').textContent = secs;
-
-    // Voice alert
-    speak('Crash detected. Sending emergency alert in ' + secs + ' seconds. Tap cancel if you are okay.');
-
-    crashCountdownTimer = setInterval(() => {
-        secs--;
-        const el = document.getElementById('crash-countdown-num');
-        if (el) el.textContent = secs;
-        if (secs <= 0) {
-            clearInterval(crashCountdownTimer);
-            crashCountdownTimer = null;
-            autoSendCrashAlert();
-        }
-    }, 1000);
-
-    showToast('🚨 Crash detected! Sending alert in ' + CRASH_COUNTDOWN + 's — tap Cancel if OK', 'danger');
+/* ── Countdown UI ── */
+function showCrashCountdownUI(reason) {
+  let overlay = document.getElementById('crash-countdown-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'crash-countdown-overlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;z-index:9800;
+      background:rgba(180,0,0,0.92);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:14px;padding:24px;text-align:center;
+      animation:fadeIn .3s ease;
+    `;
+    document.body.appendChild(overlay);
+  }
+  const label = reason === 'impact' ? '💥 Impact Detected!' : '⚡ Sudden Speed Drop!';
+  overlay.innerHTML = `
+    <div style="font-size:64px;animation:crashPulse 0.5s ease infinite">🚨</div>
+    <div style="font-family:var(--fh);font-size:26px;font-weight:900;color:#fff;letter-spacing:1px">${label}</div>
+    <div style="font-family:var(--fb);font-size:14px;color:rgba(255,255,255,0.85);max-width:300px;line-height:1.6">
+      Sending crash alert to your emergency contacts in...
+    </div>
+    <div id="crash-countdown-num" style="font-family:var(--fh);font-size:88px;font-weight:900;color:#fff;line-height:1;text-shadow:0 0 40px rgba(255,255,255,0.5)">${CRASH.COUNTDOWN_SEC}</div>
+    <div style="font-family:var(--fm);font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:2px">SECONDS</div>
+    <button onclick="cancelCrashCountdown();showToast('info','Alert cancelled — stay safe!');"
+      style="margin-top:10px;padding:16px 40px;background:#fff;color:#cc0000;border:none;border-radius:12px;
+             font-family:var(--fh);font-size:14px;font-weight:800;letter-spacing:2px;cursor:pointer;
+             box-shadow:0 4px 24px rgba(0,0,0,0.3)">
+      ✅ I'M OKAY — CANCEL
+    </button>
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px">Tap cancel if this was a false alarm</div>
+  `;
 }
 
-function cancelCrashAlert() {
-    if (crashCountdownTimer) { clearInterval(crashCountdownTimer); crashCountdownTimer = null; }
-    const bar = document.getElementById('crash-countdown-bar');
-    if (bar) bar.style.display = 'none';
-    speak('Alert cancelled. Stay safe.');
-    showToast('Alert cancelled', 'info');
+function updateCrashCountdownUI(n) {
+  const el = document.getElementById('crash-countdown-num');
+  if (el) { el.textContent = n; el.style.transform = 'scale(1.2)'; setTimeout(()=>el.style.transform='scale(1)', 200); }
 }
 
-function autoSendCrashAlert() {
-    const bar = document.getElementById('crash-countdown-bar');
-    if (bar) bar.style.display = 'none';
-
-    navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        fetch(`/api/contacts/alert?driver=driver1&lat=${lat}&lng=${lng}`, { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-                speak('Emergency alert sent to ' + data.contactsNotified + ' contacts.');
-                showToast('🚨 Alert sent to ' + data.contactsNotified + ' contacts!', 'danger');
-            });
-    }, () => {
-        // fallback if GPS unavailable
-        fetch(API_BASE+'/api/contacts/alert?driver=driver1', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => showToast('🚨 Alert sent to ' + data.contactsNotified + ' contacts (no GPS)', 'danger'));
-    });
+function hideCrashCountdownUI() {
+  const overlay = document.getElementById('crash-countdown-overlay');
+  if (overlay) overlay.remove();
 }
 
-// Helper: speak text via browser TTS (already used in your app)
-function speak(text) {
-    if (!window.speechSynthesis) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-IN';
-    u.rate = 1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+/* ── Panel visibility ── */
+function checkCrashPanelVisibility() {
+  const panel = document.getElementById('crash-alert-panel');
+  if (!panel) return;
+  // Show crash panel in normal mode always — SOS available anytime
+  if (S.mode === 'normal') {
+    panel.style.display = 'block';
+    renderCrashContactsPreview();
+  } else {
+    panel.style.display = 'none';
+  }
+  // Start crash detection as soon as user enters normal routing mode
+  // The accelerometer works immediately — GPS fallback kicks in when available
+  if (S.mode === 'normal') {
+    startCrashDetection();
+  }
 }
 
-// Hook into existing map page init
-const _origGoToMap = typeof goToMap === 'function' ? goToMap : null;
-document.addEventListener('DOMContentLoaded', () => {
-    // Inject panel whenever the map page becomes visible
-    const observer = new MutationObserver(() => {
-        const mapPage = document.getElementById('page-map');
-        if (mapPage && mapPage.classList.contains('active')) {
-            injectContactsPanel();
-        }
-    });
-    observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
-});
+function renderCrashContactsPreview() {
+  const preview = document.getElementById('crash-contacts-preview');
+  if (!preview) return;
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!user) { preview.innerHTML = '<span style="color:rgba(255,120,120,0.5)">⚠ No contacts — add them in Sign Up</span>'; return; }
+  let html = '<div style="margin-bottom:4px;font-size:9px;letter-spacing:1px;opacity:0.6">ALERT WILL GO TO:</div>';
+  let hasContact = false;
+  if (user.contact1Name || user.contact1Email) {
+    html += `<span>👤 ${user.contact1Name || 'Contact 1'}${user.contact1Email ? ' · ' + user.contact1Email : ''}</span>`;
+    hasContact = true;
+  }
+  if (user.contact2Name || user.contact2Email) {
+    html += `<span>👤 ${user.contact2Name || 'Contact 2'}${user.contact2Email ? ' · ' + user.contact2Email : ''}</span>`;
+    hasContact = true;
+  }
+  if (!hasContact) html += '<span style="color:rgba(255,120,120,0.5)">⚠ No contacts saved</span>';
+  preview.innerHTML = html;
+}
+
+/* ── Manual trigger (SOS button — always available on map page) ── */
+function triggerCrashAlert() {
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!user) { showToast('warning', 'Please sign in first'); return; }
+
+  const routeDiv = document.getElementById('crash-modal-route');
+  if (routeDiv) {
+    if (S.src && S.dst) {
+      routeDiv.innerHTML =
+        `<div>📍 <b>From:</b> ${S.src.name}</div>` +
+        `<div>🏁 <b>To:</b> ${S.dst.name}</div>` +
+        `<div style="margin-top:4px;opacity:0.6">📡 Fetching live GPS…</div>`;
+    } else {
+      routeDiv.innerHTML =
+        `<div style="color:rgba(255,200,100,0.9)">⚠ No route set — live GPS location will be used</div>` +
+        `<div style="margin-top:4px;opacity:0.6">📡 Fetching your current position…</div>`;
+    }
+  }
+
+  const contactsDiv = document.getElementById('crash-modal-contacts');
+  if (contactsDiv) {
+    let chips = '';
+    if (user.contact1Name || user.contact1Email)
+      chips += `<div class="contact-chip">👤 ${user.contact1Name || 'Contact 1'}${user.contact1Email ? ' · ' + user.contact1Email : ''}</div>`;
+    if (user.contact2Name || user.contact2Email)
+      chips += `<div class="contact-chip">👤 ${user.contact2Name || 'Contact 2'}${user.contact2Email ? ' · ' + user.contact2Email : ''}</div>`;
+    if (!chips) chips = '<div class="contact-chip" style="opacity:0.5">⚠ No contacts saved — add them in account settings</div>';
+    contactsDiv.innerHTML = chips;
+  }
+
+  document.getElementById('crash-modal').classList.add('show');
+}
+
+function closeCrashModal() {
+  document.getElementById('crash-modal').classList.remove('show');
+}
+
+/* ── Send the alert (called by modal confirm OR auto countdown) ── */
+async function confirmCrashAlert() {
+  closeCrashModal();
+  cancelCrashCountdown();
+
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  const btn  = document.getElementById('crash-alert-btn');
+  if (btn) { btn.classList.add('sending'); btn.querySelector('.crash-btn-text').textContent = 'SENDING…'; }
+
+  // Get live GPS
+  let lat = S.src ? S.src.lat : 0;
+  let lng = S.src ? S.src.lng : 0;
+  try {
+    const pos = await new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej, {timeout: 4000}));
+    lat = pos.coords.latitude;
+    lng = pos.coords.longitude;
+  } catch(e) { /* use route src fallback */ }
+
+  let sent = 0;
+  let notified = [];
+
+  if (user) {
+    // Hit backend — backend does the actual Fast2SMS call
+    try {
+      const res = await fetch(API_BASE + `/api/users/crash-alert?email=${encodeURIComponent(user.email)}&lat=${lat}&lng=${lng}`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      sent = data.emailsSent || 0;
+      console.log('[CRASH] Backend response:', JSON.stringify(data));
+      if (sent === 0) {
+        console.warn('[CRASH] Backend reached but emailsSent=0 — check server logs for [EMAIL] errors');
+        showToast('warning', '⚠️ Alert sent to server but emails may not have delivered. Check your Gmail App Password config.');
+      }
+    } catch(e) {
+      console.error('[CRASH] Backend unreachable:', e.message);
+      showToast('warning', '⚠️ Could not reach server! Make sure Spring Boot is running on port 8082.');
+    }
+
+    if (user.contact1Name || user.contact1Email) notified.push(user.contact1Name ? user.contact1Name : user.contact1Email);
+    if (user.contact2Name || user.contact2Email) notified.push(user.contact2Name ? user.contact2Name : user.contact2Email);
+  }
+
+  const notifiedStr = notified.length ? notified.join(', ') : 'your emergency contacts';
+  const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+
+  // Log to feed
+  addLog('critical', 'CRASH ALERT', `🚨 SMS sent to ${notifiedStr} · Location: ${mapsUrl}`);
+
+  // Show sent overlay
+  const overlay = document.getElementById('crash-sent-overlay');
+  const sentMsg = document.getElementById('crash-sent-msg');
+  if (sentMsg) sentMsg.innerHTML = `SMS sent to: ${notifiedStr}<br>${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  if (overlay) { overlay.classList.add('show'); setTimeout(() => overlay.classList.remove('show'), 4500); }
+
+  setTimeout(() => {
+    if (btn) { btn.classList.remove('sending'); btn.querySelector('.crash-btn-text').textContent = 'SEND CRASH ALERT NOW'; }
+  }, 3000);
+
+  showToast('critical', `🚨 Alert sent to ${notifiedStr}`);
+  speak(`Crash alert sent to ${notifiedStr}. Help is on the way.`);
+}
+
+function logoutUser() {
+  localStorage.removeItem('user');
+  disconnectWS();
+  stopVoiceAlert();
+  stopCrashDetection();
+  showPage('page-home');
+  showToast('info', 'Logged out successfully');
+}
